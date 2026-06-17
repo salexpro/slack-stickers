@@ -1,0 +1,23 @@
+display_information:
+  name: Slack Stickers
+  description: Send your Telegram stickers in Slack
+features:
+  bot_user:
+    display_name: slack-stickers
+    always_online: true
+  slash_commands:
+    - command: /ss
+      url: https://<worker-url>/slack/command
+      description: Send a Telegram sticker
+      usage_hint: "[link-code]"
+oauth_config:
+  scopes:
+    bot:
+      - commands
+      - chat:write
+settings:
+  interactivity:
+    is_enabled: true
+    request_url: https://<worker-url>/slack/interact
+  org_deploy_enabled: false
+  socket_mode_enabled: false
