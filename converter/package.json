@@ -1,0 +1,27 @@
+{
+  "name": "slack-stickers-converter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node dist/server.js",
+    "build": "tsc",
+    "dev": "tsx src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "hono": "^4.6.0",
+    "sharp": "^0.33.5",
+    "puppeteer": "^23.0.0",
+    "gifenc": "^1.0.3",
+    "pako": "^2.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pako": "^2.0.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  }
+}
