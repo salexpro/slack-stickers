@@ -1,0 +1,8 @@
+# Copy to worker/.dev.vars for local `wrangler dev`. (.dev.vars is gitignored.)
+# In production these are set with `wrangler secret put` — see DEPLOY.md.
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
+SLACK_SIGNING_SECRET=
+SLACK_BOT_TOKEN=
+CONVERTER_URL=
+# R2_PUBLIC_BASE is a plain var in wrangler.toml, not a secret.
