@@ -1,7 +1,12 @@
 import sharp from 'sharp';
 import pako from 'pako';
 import puppeteer from 'puppeteer';
-import { GIFEncoder, quantize, applyPalette } from 'gifenc';
+import { createRequire } from 'node:module';
+
+// gifenc ships CJS whose default-interop differs between Node ESM and esbuild/vitest.
+// createRequire returns the full module.exports identically in both runtimes.
+const require = createRequire(import.meta.url);
+const { GIFEncoder, quantize, applyPalette } = require('gifenc') as typeof import('gifenc').default;
 
 const WIDTH = 150;
 
