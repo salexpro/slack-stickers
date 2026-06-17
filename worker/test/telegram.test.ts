@@ -5,7 +5,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('telegram helpers', () => {
   it('sendMessage posts to the bot API with chat_id and text', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const fetchMock = vi.fn(async (..._args: any[]) => new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     await tgSendMessage('TOKEN', 123, 'hello');
     const [url, init] = fetchMock.mock.calls[0];

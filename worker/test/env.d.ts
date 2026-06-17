@@ -1,4 +1,7 @@
+/// <reference path="../node_modules/@cloudflare/vitest-pool-workers/types/cloudflare-test.d.ts" />
+
 declare module 'cloudflare:test' {
+  // Augments the ProvidedEnv declared by @cloudflare/vitest-pool-workers/types.
   interface ProvidedEnv {
     DB: D1Database;
     IMAGES: R2Bucket;

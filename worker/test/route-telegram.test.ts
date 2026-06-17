@@ -16,7 +16,7 @@ describe('telegram webhook', () => {
   });
 
   it('responds to /start by sending a code via the bot API', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, result: { message_id: 1 } })));
+    const fetchMock = vi.fn(async (..._args: any[]) => new Response(JSON.stringify({ ok: true, result: { message_id: 1 } })));
     vi.stubGlobal('fetch', fetchMock);
 
     const res = await SELF.fetch('https://x/telegram/webhook', {
