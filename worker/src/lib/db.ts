@@ -64,3 +64,69 @@ export async function getTelegramUserId(
     .first<{ telegram_user_id: number }>();
   return row?.telegram_user_id ?? null;
 }
+
+export async function getSticker(
+  db: D1Database,
+  fileUniqueId: string
+): Promise<StickerRecord | null> {
+  return await db
+    .prepare('SELECT * FROM stickers WHERE file_unique_id = ?')
+    .bind(fileUniqueId)
+    .first<StickerRecord>();
+}
+
+export async function upsertSticker(db: D1Database, s: StickerRecord): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO stickers (file_unique_id, ext, animated, r2_key, public_url, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(file_unique_id) DO UPDATE SET
+         ext = excluded.ext, animated = excluded.animated,
+         r2_key = excluded.r2_key, public_url = excluded.public_url`
+    )
+    .bind(s.file_unique_id, s.ext, s.animated, s.r2_key, s.public_url, s.created_at)
+    .run();
+}
+
+export async function addUserSticker(
+  db: D1Database,
+  telegramUserId: number,
+  fileUniqueId: string,
+  nowSec: number
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO user_stickers (telegram_user_id, file_unique_id, added_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(telegram_user_id, file_unique_id) DO UPDATE SET added_at = excluded.added_at`
+    )
+    .bind(telegramUserId, fileUniqueId, nowSec)
+    .run();
+}
+
+export async function removeUserSticker(
+  db: D1Database,
+  telegramUserId: number,
+  fileUniqueId: string
+): Promise<void> {
+  await db
+    .prepare('DELETE FROM user_stickers WHERE telegram_user_id = ? AND file_unique_id = ?')
+    .bind(telegramUserId, fileUniqueId)
+    .run();
+}
+
+export async function listUserStickers(
+  db: D1Database,
+  telegramUserId: number
+): Promise<StickerRecord[]> {
+  const res = await db
+    .prepare(
+      `SELECT s.* FROM user_stickers us
+       JOIN stickers s ON s.file_unique_id = us.file_unique_id
+       WHERE us.telegram_user_id = ?
+       ORDER BY us.added_at DESC`
+    )
+    .bind(telegramUserId)
+    .all<StickerRecord>();
+  return res.results ?? [];
+}
