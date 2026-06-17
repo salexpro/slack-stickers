@@ -1,0 +1,13 @@
+name = "slack-stickers"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "slack-stickers"
+database_id = "PLACEHOLDER_SET_AFTER_d1_create"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "slack-stickers-img"
