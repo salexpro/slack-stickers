@@ -47,14 +47,18 @@ export async function firstFramePng(frame: Uint8ClampedArray, size: number): Pro
 }
 
 // Renders Lottie frames to RGBA in headless Chromium via lottie-web.
-async function renderFrames(animation: any): Promise<{ frames: Uint8ClampedArray[]; delayMs: number }> {
+async function renderFrames(animation: any): Promise<{ frames: Uint8ClampedArray[]; delayMs: number; size: number }> {
   const browser = await puppeteer.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     headless: true,
   });
   try {
     const page = await browser.newPage();
-    await page.setContent('<div id="c"></div>');
+    // Pin devicePixelRatio to 1 so the canvas lottie creates is exactly SIZE×SIZE.
+    await page.setViewport({ width: SIZE * 2, height: SIZE * 2, deviceScaleFactor: 1 });
+    // Size the container BEFORE loadAnimation so lottie sizes its canvas to SIZE and
+    // installs a fit transform for the sticker's native (512px) art.
+    await page.setContent(`<body style="margin:0"><div id="c" style="width:${SIZE}px;height:${SIZE}px"></div></body>`);
     await page.addScriptTag({
       url: 'https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js',
     });
@@ -67,23 +71,27 @@ async function renderFrames(animation: any): Promise<{ frames: Uint8ClampedArray
         animationData: data,
         rendererSettings: { clearCanvas: true },
       });
+      // Do NOT resize the canvas here. Lottie already sized it to the SIZE container and
+      // computed the fit transform; forcing canvas.width/height afterwards (the old bug)
+      // left lottie drawing at native 512px scale into a 150px canvas, so only the
+      // top-left corner was captured — the "cropped / blinking edge" symptom.
+      const canvas: HTMLCanvasElement = document.querySelector('#c canvas')!;
+      const w = canvas.width, h = canvas.height;
       const total = Math.min(Math.ceil(anim.totalFrames), maxFrames);
       const step = Math.max(1, Math.floor(anim.totalFrames / total));
-      const canvas: HTMLCanvasElement = document.querySelector('#c canvas')!;
-      canvas.width = size; canvas.height = size;
       const out: number[][] = [];
       for (let f = 0; f < anim.totalFrames; f += step) {
         anim.goToAndStop(f, true);
         const ctx = canvas.getContext('2d')!;
-        const img = ctx.getImageData(0, 0, size, size);
+        const img = ctx.getImageData(0, 0, w, h);
         out.push(Array.from(img.data));
       }
-      return { frames: out, fr: anim.frameRate, step };
+      return { frames: out, fr: anim.frameRate, step, size: w };
     }, animation, SIZE, MAX_FRAMES);
 
     const frames = result.frames.map((f: number[]) => new Uint8ClampedArray(f));
     const delayMs = Math.round((1000 / (result.fr || 30)) * result.step);
-    return { frames, delayMs };
+    return { frames, delayMs, size: result.size };
   } finally {
     await browser.close();
   }
@@ -92,14 +100,14 @@ async function renderFrames(animation: any): Promise<{ frames: Uint8ClampedArray
 export async function convertAnimated(input: Buffer | Uint8Array): Promise<AnimatedResult> {
   const animation = parseTgs(input);
   try {
-    const { frames, delayMs } = await renderFrames(animation);
+    const { frames, delayMs, size } = await renderFrames(animation);
     if (frames.length === 0) throw new Error('no frames rendered');
-    return { bytes: encodeGif(frames, SIZE, delayMs), ext: 'gif' };
+    return { bytes: encodeGif(frames, size, delayMs), ext: 'gif' };
   } catch (err) {
     // Fallback: render just the first frame to a static PNG.
-    const { frames } = await renderFrames(animation).catch(() => ({ frames: [] as Uint8ClampedArray[] }));
+    const { frames, size } = await renderFrames(animation).catch(() => ({ frames: [] as Uint8ClampedArray[], size: SIZE }));
     if (frames.length > 0) {
-      return { bytes: await firstFramePng(frames[0], SIZE), ext: 'png' };
+      return { bytes: await firstFramePng(frames[0], size), ext: 'png' };
     }
     throw err;
   }
