@@ -31,9 +31,24 @@ const MAX_FRAMES = 30;
 export function encodeGif(frames: Uint8ClampedArray[], size: number, delayMs: number): Buffer {
   const enc = GIFEncoder();
   for (const frame of frames) {
-    const palette = quantize(frame, 256);
-    const index = applyPalette(frame, palette);
-    enc.writeFrame(index, size, size, { palette, delay: delayMs, transparent: true });
+    // Alpha-aware quantization. The old default (rgb565) ignored the alpha channel, so
+    // transparency was never keyed to a real palette slot and opaque pixels collapsed
+    // onto a bad color — the magenta fill. rgba4444 + oneBitAlpha reserves a fully
+    // transparent entry at index 0, which writeFrame marks as the transparent color.
+    const palette = quantize(frame, 256, {
+      format: 'rgba4444',
+      oneBitAlpha: true,
+      clearAlpha: true,
+      clearAlphaColor: 0x00,
+    });
+    const index = applyPalette(frame, palette, 'rgba4444');
+    enc.writeFrame(index, size, size, {
+      palette,
+      delay: delayMs,
+      transparent: true,
+      transparentIndex: 0,
+      dispose: 2,
+    });
   }
   enc.finish();
   return Buffer.from(enc.bytes());
@@ -47,7 +62,7 @@ export async function firstFramePng(frame: Uint8ClampedArray, size: number): Pro
 }
 
 // Renders Lottie frames to RGBA in headless Chromium via lottie-web.
-async function renderFrames(animation: any): Promise<{ frames: Uint8ClampedArray[]; delayMs: number; size: number }> {
+export async function renderFrames(animation: any): Promise<{ frames: Uint8ClampedArray[]; delayMs: number; size: number }> {
   const browser = await puppeteer.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     headless: true,
