@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
-import { convertStatic, convertAnimated } from './convert.js';
+import { convertStatic, convertAnimated, convertVideo } from './convert.js';
 
 export const app = new Hono();
 
@@ -17,6 +17,12 @@ app.post('/convert', async (c) => {
     }
     if (kind === 'animated') {
       const { bytes, ext } = await convertAnimated(input);
+      return new Response(new Uint8Array(bytes), {
+        headers: { 'content-type': ext === 'gif' ? 'image/gif' : 'image/png' },
+      });
+    }
+    if (kind === 'video') {
+      const { bytes, ext } = await convertVideo(input);
       return new Response(new Uint8Array(bytes), {
         headers: { 'content-type': ext === 'gif' ? 'image/gif' : 'image/png' },
       });

@@ -134,3 +134,65 @@ export async function convertAnimated(input: Buffer | Uint8Array): Promise<Anima
     throw err;
   }
 }
+
+// Converts a webm (video) sticker to an animated GIF by seeking through it in headless
+// Chromium (which decodes VP9 + alpha) and capturing each frame to a canvas.
+export async function convertVideo(input: Buffer | Uint8Array): Promise<AnimatedResult> {
+  const browser = await puppeteer.launch({
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    headless: true,
+  });
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: SIZE * 2, height: SIZE * 2, deviceScaleFactor: 1 });
+    await page.setContent('<body style="margin:0"></body>');
+    const dataUrl = 'data:video/webm;base64,' + Buffer.from(input).toString('base64');
+    const result = await page.evaluate(async (src, size, maxFrames) => {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.src = src;
+      await new Promise<void>((resolve, reject) => {
+        video.onloadeddata = () => resolve();
+        video.onerror = () => reject(new Error('video failed to load'));
+        setTimeout(() => reject(new Error('video load timeout')), 15000);
+      });
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      const vw = video.videoWidth || size;
+      const vh = video.videoHeight || size;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d')!;
+      // Sample ~15fps, capped at maxFrames.
+      const target = Math.max(1, Math.min(maxFrames, Math.round((duration || 1) * 15)));
+      const out: number[][] = [];
+      for (let i = 0; i < target; i++) {
+        const t = duration ? (duration * i) / target : 0;
+        await new Promise<void>((resolve) => {
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            video.removeEventListener('seeked', finish);
+            resolve();
+          };
+          video.addEventListener('seeked', finish);
+          video.currentTime = t;
+          setTimeout(finish, 500); // safety net (e.g. seeking to the current time fires nothing)
+        });
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(video, 0, 0, vw, vh, 0, 0, size, size);
+        out.push(Array.from(ctx.getImageData(0, 0, size, size).data));
+      }
+      return { frames: out, target, duration };
+    }, dataUrl, SIZE, MAX_FRAMES);
+
+    const frames = result.frames.map((f: number[]) => new Uint8ClampedArray(f));
+    if (frames.length === 0) throw new Error('no video frames rendered');
+    const fps = result.duration ? result.target / result.duration : 15;
+    const delayMs = Math.round(1000 / (fps || 15));
+    return { bytes: encodeGif(frames, SIZE, delayMs), ext: 'gif' };
+  } finally {
+    await browser.close();
+  }
+}
