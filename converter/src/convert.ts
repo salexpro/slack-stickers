@@ -6,7 +6,14 @@ import { createRequire } from 'node:module';
 // gifenc ships CJS whose default-interop differs between Node ESM and esbuild/vitest.
 // createRequire returns the full module.exports identically in both runtimes.
 const require = createRequire(import.meta.url);
-const { GIFEncoder, quantize, applyPalette } = require('gifenc') as typeof import('gifenc').default;
+// gifenc@1.0.3's bundled .d.ts omits options the runtime supports (quantize `format`/
+// `oneBitAlpha`, applyPalette `format`, writeFrame `transparentIndex`/`dispose`), so the
+// typed import rejects the alpha-aware calls below. Type it loosely — runtime is correct.
+const { GIFEncoder, quantize, applyPalette } = require('gifenc') as {
+  GIFEncoder: () => any;
+  quantize: (rgba: Uint8ClampedArray | Uint8Array, maxColors: number, opts?: any) => number[][];
+  applyPalette: (rgba: Uint8ClampedArray | Uint8Array, palette: number[][], format?: string) => Uint8Array;
+};
 
 const WIDTH = 150;
 
